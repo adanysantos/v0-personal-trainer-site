@@ -12,6 +12,8 @@ import type { WorkoutPlan } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 
+export const dynamic = "force-dynamic"
+
 export default function InstructorDashboard() {
   const [workouts, setWorkouts] = useState<WorkoutPlan[]>([])
   const [students, setStudents] = useState<any[]>([])

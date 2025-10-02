@@ -9,6 +9,8 @@ import { WorkoutDetailCard } from "@/components/workout-detail-card"
 import type { WorkoutPlan } from "@/lib/types"
 import { createBrowserClient } from "@/lib/supabase/client"
 
+export const dynamic = "force-dynamic"
+
 export default function StudentDashboard() {
   const [workouts, setWorkouts] = useState<WorkoutPlan[]>([])
   const [loading, setLoading] = useState(true)
