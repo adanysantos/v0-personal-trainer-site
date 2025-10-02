@@ -1,0 +1,97 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Header } from "@/components/header"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dumbbell, TrendingUp, Target } from "lucide-react"
+import { getCurrentUser, getWorkoutsByStudent } from "@/lib/workout-data"
+import { WorkoutDetailCard } from "@/components/workout-detail-card"
+import type { WorkoutPlan } from "@/lib/types"
+
+export default function StudentDashboard() {
+  const [workouts, setWorkouts] = useState<WorkoutPlan[]>([])
+  const router = useRouter()
+
+  useEffect(() => {
+    const user = getCurrentUser()
+    if (!user || user.role !== "student") {
+      router.push("/")
+      return
+    }
+
+    const studentWorkouts = getWorkoutsByStudent(user.id)
+    setWorkouts(studentWorkouts)
+  }, [router])
+
+  const totalExercises = workouts.reduce((acc, workout) => acc + workout.exercises.length, 0)
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100">
+      <Header />
+
+      <main className="container mx-auto px-4 py-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Planos Ativos</CardTitle>
+              <Target className="w-4 h-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{workouts.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">Treinos disponíveis</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total de Exercícios</CardTitle>
+              <Dumbbell className="w-4 h-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{totalExercises}</div>
+              <p className="text-xs text-muted-foreground mt-1">Em todos os planos</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Progresso</CardTitle>
+              <TrendingUp className="w-4 h-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">100%</div>
+              <p className="text-xs text-muted-foreground mt-1">Planos sincronizados</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Workouts Section */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold mb-2">Meus Planos de Treino</h2>
+          <p className="text-muted-foreground">Acompanhe seus treinos personalizados</p>
+        </div>
+
+        {workouts.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Dumbbell className="w-16 h-16 text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Nenhum treino disponível</h3>
+              <p className="text-muted-foreground text-center max-w-md">
+                Seu instrutor ainda não criou nenhum plano de treino para você. Entre em contato para receber seu
+                primeiro treino personalizado!
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {workouts.map((workout) => (
+              <WorkoutDetailCard key={workout.id} workout={workout} />
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}
