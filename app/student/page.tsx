@@ -5,30 +5,69 @@ import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dumbbell, TrendingUp, Target } from "lucide-react"
-import { getCurrentUser, getWorkoutsByStudent } from "@/lib/workout-data"
 import { WorkoutDetailCard } from "@/components/workout-detail-card"
 import type { WorkoutPlan } from "@/lib/types"
+import { createBrowserClient } from "@/lib/supabase/client"
 
 export default function StudentDashboard() {
   const [workouts, setWorkouts] = useState<WorkoutPlan[]>([])
+  const [loading, setLoading] = useState(true)
+  const [userName, setUserName] = useState("")
   const router = useRouter()
+  const supabase = createBrowserClient()
 
   useEffect(() => {
-    const user = getCurrentUser()
-    if (!user || user.role !== "student") {
-      router.push("/")
-      return
+    async function loadData() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        router.push("/")
+        return
+      }
+
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+
+      if (!profile || profile.role !== "student") {
+        router.push("/")
+        return
+      }
+
+      setUserName(profile.name)
+
+      const { data: plans } = await supabase
+        .from("workout_plans")
+        .select("*")
+        .eq("student_id", user.id)
+        .order("updated_at", { ascending: false })
+
+      if (plans) {
+        setWorkouts(plans as WorkoutPlan[])
+      }
+
+      setLoading(false)
     }
 
-    const studentWorkouts = getWorkoutsByStudent(user.id)
-    setWorkouts(studentWorkouts)
-  }, [router])
+    loadData()
+  }, [router, supabase])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center">
+        <div className="text-center">
+          <Dumbbell className="w-12 h-12 text-orange-500 animate-pulse mx-auto mb-4" />
+          <p className="text-muted-foreground">Carregando seus treinos...</p>
+        </div>
+      </div>
+    )
+  }
 
   const totalExercises = workouts.reduce((acc, workout) => acc + workout.exercises.length, 0)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100">
-      <Header />
+      <Header userName={userName} />
 
       <main className="container mx-auto px-4 py-8">
         {/* Stats Cards */}

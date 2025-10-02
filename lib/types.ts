@@ -5,7 +5,6 @@ export interface User {
   name: string
   email: string
   role: UserRole
-  password: string
 }
 
 export interface Exercise {
@@ -19,11 +18,19 @@ export interface Exercise {
 
 export interface WorkoutPlan {
   id: string
-  studentId: string
-  studentName: string
+  student_id: string
+  student_name: string
   title: string
   description: string
   exercises: Exercise[]
-  createdAt: string
-  updatedAt: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Profile {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+  created_at: string
 }

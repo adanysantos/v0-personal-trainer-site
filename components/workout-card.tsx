@@ -5,26 +5,39 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Edit, Trash2, User, Calendar } from "lucide-react"
 import type { WorkoutPlan } from "@/lib/types"
-import { deleteWorkout } from "@/lib/workout-data"
+import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 
 interface WorkoutCardProps {
   workout: WorkoutPlan
   onEdit?: (workout: WorkoutPlan) => void
   showActions?: boolean
+  onDelete?: () => void
 }
 
-export function WorkoutCard({ workout, onEdit, showActions = false }: WorkoutCardProps) {
+export function WorkoutCard({ workout, onEdit, showActions = false, onDelete }: WorkoutCardProps) {
   const { toast } = useToast()
+  const supabase = createClient()
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm("Tem certeza que deseja excluir este plano de treino?")) {
-      deleteWorkout(workout.id)
+      const { error } = await supabase.from("workout_plans").delete().eq("id", workout.id)
+
+      if (error) {
+        toast({
+          title: "Erro ao excluir",
+          description: "Não foi possível excluir o plano de treino",
+          variant: "destructive",
+        })
+        return
+      }
+
       toast({
         title: "Plano excluído",
         description: "O plano de treino foi removido com sucesso",
       })
-      window.location.reload()
+
+      onDelete?.()
     }
   }
 

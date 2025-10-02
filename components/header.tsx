@@ -3,16 +3,37 @@
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Dumbbell, LogOut } from "lucide-react"
-import { logout, getCurrentUser } from "@/lib/workout-data"
+import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
+import { useEffect, useState } from "react"
 
 export function Header() {
   const router = useRouter()
   const { toast } = useToast()
-  const user = getCurrentUser()
+  const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null)
+  const supabase = createClient()
 
-  const handleLogout = () => {
-    logout()
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser()
+      if (authUser) {
+        const { data: profile } = await supabase.from("profiles").select("*").eq("id", authUser.id).single()
+        if (profile) {
+          setUser({
+            name: profile.name,
+            email: authUser.email || "",
+            role: profile.role,
+          })
+        }
+      }
+    }
+    fetchUser()
+  }, [supabase])
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
     toast({
       title: "Logout realizado",
       description: "Até logo!",

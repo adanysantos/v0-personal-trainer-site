@@ -2,59 +2,99 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dumbbell } from "lucide-react"
-import { login, initializeData, getCurrentUser } from "@/lib/workout-data"
+import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const [loginEmail, setLoginEmail] = useState("")
+  const [loginPassword, setLoginPassword] = useState("")
+  const [signupEmail, setSignupEmail] = useState("")
+  const [signupPassword, setSignupPassword] = useState("")
+  const [signupName, setSignupName] = useState("")
+  const [signupUserType, setSignupUserType] = useState<"instructor" | "student">("student")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
 
-  useEffect(() => {
-    initializeData()
-
-    // Check if user is already logged in
-    const currentUser = getCurrentUser()
-    if (currentUser) {
-      router.push(currentUser.role === "instructor" ? "/instructor" : "/student")
-    }
-  }, [router])
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    const supabase = createClient()
 
     try {
-      const user = login(email, password)
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPassword,
+      })
 
-      if (user) {
+      if (error) throw error
+
+      if (data.user) {
+        // Get user profile to determine redirect
+        const { data: profile } = await supabase.from("profiles").select("user_type").eq("id", data.user.id).single()
+
         toast({
           title: "Login realizado com sucesso!",
-          description: `Bem-vindo, ${user.name}`,
+          description: `Bem-vindo de volta!`,
         })
 
-        // Redirect based on role
-        router.push(user.role === "instructor" ? "/instructor" : "/student")
-      } else {
-        toast({
-          title: "Erro no login",
-          description: "Email ou senha incorretos",
-          variant: "destructive",
-        })
+        router.push(profile?.user_type === "instructor" ? "/instructor" : "/student")
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao fazer login",
+        title: "Erro no login",
+        description: error.message || "Email ou senha incorretos",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    const supabase = createClient()
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: signupEmail,
+        password: signupPassword,
+        options: {
+          emailRedirectTo:
+            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
+            `${window.location.origin}/${signupUserType === "instructor" ? "instructor" : "student"}`,
+          data: {
+            full_name: signupName,
+            user_type: signupUserType,
+          },
+        },
+      })
+
+      if (error) throw error
+
+      toast({
+        title: "Conta criada com sucesso!",
+        description: "Verifique seu email para confirmar sua conta.",
+      })
+
+      // Reset form
+      setSignupEmail("")
+      setSignupPassword("")
+      setSignupName("")
+    } catch (error: any) {
+      toast({
+        title: "Erro ao criar conta",
+        description: error.message || "Ocorreu um erro ao criar sua conta",
         variant: "destructive",
       })
     } finally {
@@ -75,45 +115,99 @@ export default function LoginPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600" disabled={isLoading}>
-              {isLoading ? "Entrando..." : "Entrar"}
-            </Button>
-          </form>
+          <Tabs defaultValue="login" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login">Entrar</TabsTrigger>
+              <TabsTrigger value="signup">Criar Conta</TabsTrigger>
+            </TabsList>
 
-          <div className="mt-6 p-4 bg-muted rounded-lg space-y-2 text-sm">
-            <p className="font-semibold">Contas de teste:</p>
-            <div className="space-y-1">
-              <p>
-                <strong>Instrutor:</strong> instrutor@gym.com / instrutor123
-              </p>
-              <p>
-                <strong>Aluno:</strong> maria@email.com / aluno123
-              </p>
-            </div>
-          </div>
+            <TabsContent value="login">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">Email</Label>
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">Senha</Label>
+                  <Input
+                    id="login-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600" disabled={isLoading}>
+                  {isLoading ? "Entrando..." : "Entrar"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="signup">
+              <form onSubmit={handleSignup} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-name">Nome Completo</Label>
+                  <Input
+                    id="signup-name"
+                    type="text"
+                    placeholder="Seu nome"
+                    value={signupName}
+                    onChange={(e) => setSignupName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Senha</Label>
+                  <Input
+                    id="signup-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={signupPassword}
+                    onChange={(e) => setSignupPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="user-type">Tipo de Conta</Label>
+                  <Select
+                    value={signupUserType}
+                    onValueChange={(value: "instructor" | "student") => setSignupUserType(value)}
+                  >
+                    <SelectTrigger id="user-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="student">Aluno</SelectItem>
+                      <SelectItem value="instructor">Instrutor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600" disabled={isLoading}>
+                  {isLoading ? "Criando conta..." : "Criar Conta"}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

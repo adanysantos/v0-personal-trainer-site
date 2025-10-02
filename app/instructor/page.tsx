@@ -6,29 +6,99 @@ import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Users, Dumbbell, Calendar } from "lucide-react"
-import { getCurrentUser, getWorkouts, getStudents } from "@/lib/workout-data"
 import { WorkoutCard } from "@/components/workout-card"
 import { WorkoutDialog } from "@/components/workout-dialog"
 import type { WorkoutPlan } from "@/lib/types"
+import { createClient } from "@/lib/supabase/client"
+import { useToast } from "@/hooks/use-toast"
 
 export default function InstructorDashboard() {
   const [workouts, setWorkouts] = useState<WorkoutPlan[]>([])
+  const [students, setStudents] = useState<any[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingWorkout, setEditingWorkout] = useState<WorkoutPlan | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const { toast } = useToast()
 
   useEffect(() => {
-    const user = getCurrentUser()
-    if (!user || user.role !== "instructor") {
+    checkAuthAndLoadData()
+  }, [])
+
+  const checkAuthAndLoadData = async () => {
+    const supabase = createClient()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
       router.push("/")
       return
     }
 
-    loadWorkouts()
-  }, [router])
+    // Check if user is instructor
+    const { data: profile } = await supabase.from("profiles").select("user_type").eq("id", user.id).single()
 
-  const loadWorkouts = () => {
-    setWorkouts(getWorkouts())
+    if (profile?.user_type !== "instructor") {
+      router.push("/student")
+      return
+    }
+
+    await loadData(user.id)
+  }
+
+  const loadData = async (instructorId: string) => {
+    const supabase = createClient()
+    setIsLoading(true)
+
+    try {
+      // Load students
+      const { data: studentsData } = await supabase.from("profiles").select("*").eq("user_type", "student")
+
+      setStudents(studentsData || [])
+
+      // Load workouts with exercises
+      const { data: workoutsData } = await supabase
+        .from("workout_plans")
+        .select(`
+          *,
+          exercises (*),
+          student:profiles!workout_plans_student_id_fkey (full_name)
+        `)
+        .eq("instructor_id", instructorId)
+        .order("created_at", { ascending: false })
+
+      const formattedWorkouts: WorkoutPlan[] = (workoutsData || []).map((w: any) => ({
+        id: w.id,
+        studentId: w.student_id,
+        studentName: w.student?.full_name || "Aluno",
+        title: w.title,
+        description: w.description || "",
+        exercises: (w.exercises || [])
+          .sort((a: any, b: any) => a.order_index - b.order_index)
+          .map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            sets: e.sets,
+            reps: e.reps,
+            rest: e.rest_time || "",
+            notes: e.notes || "",
+          })),
+        createdAt: w.created_at,
+        updatedAt: w.updated_at,
+      }))
+
+      setWorkouts(formattedWorkouts)
+    } catch (error: any) {
+      toast({
+        title: "Erro ao carregar dados",
+        description: error.message,
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleCreateNew = () => {
@@ -41,14 +111,29 @@ export default function InstructorDashboard() {
     setIsDialogOpen(true)
   }
 
-  const handleDialogClose = () => {
+  const handleDialogClose = async () => {
     setIsDialogOpen(false)
     setEditingWorkout(null)
-    loadWorkouts()
+
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      await loadData(user.id)
+    }
   }
 
-  const students = getStudents()
-  const totalWorkouts = workouts.length
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center">
+        <div className="text-center">
+          <Dumbbell className="w-12 h-12 text-orange-500 animate-pulse mx-auto mb-4" />
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100">
@@ -73,7 +158,7 @@ export default function InstructorDashboard() {
               <Dumbbell className="w-4 h-4 text-orange-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{totalWorkouts}</div>
+              <div className="text-3xl font-bold">{workouts.length}</div>
             </CardContent>
           </Card>
 
@@ -125,6 +210,7 @@ export default function InstructorDashboard() {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         workout={editingWorkout}
+        students={students}
         onClose={handleDialogClose}
       />
     </div>

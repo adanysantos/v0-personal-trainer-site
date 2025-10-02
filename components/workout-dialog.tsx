@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Trash2 } from "lucide-react"
 import type { WorkoutPlan, Exercise } from "@/lib/types"
-import { saveWorkout, getStudents } from "@/lib/workout-data"
+import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 
 interface WorkoutDialogProps {
@@ -19,14 +19,30 @@ interface WorkoutDialogProps {
   onClose: () => void
 }
 
+interface Student {
+  id: string
+  name: string
+  email: string
+}
+
 export function WorkoutDialog({ open, onOpenChange, workout, onClose }: WorkoutDialogProps) {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [studentId, setStudentId] = useState("")
   const [exercises, setExercises] = useState<Exercise[]>([])
+  const [students, setStudents] = useState<Student[]>([])
   const { toast } = useToast()
+  const supabase = createClient()
 
-  const students = getStudents()
+  useEffect(() => {
+    const fetchStudents = async () => {
+      const { data } = await supabase.from("profiles").select("id, name, email").eq("role", "student")
+      if (data) {
+        setStudents(data)
+      }
+    }
+    fetchStudents()
+  }, [supabase])
 
   useEffect(() => {
     if (workout) {
@@ -64,7 +80,7 @@ export function WorkoutDialog({ open, onOpenChange, workout, onClose }: WorkoutD
     setExercises(exercises.map((e) => (e.id === id ? { ...e, [field]: value } : e)))
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!title || !studentId || exercises.length === 0) {
       toast({
         title: "Campos obrigatórios",
@@ -77,16 +93,41 @@ export function WorkoutDialog({ open, onOpenChange, workout, onClose }: WorkoutD
     const student = students.find((s) => s.id === studentId)
     if (!student) return
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+
     const workoutData = {
-      ...(workout && { id: workout.id }),
-      studentId,
-      studentName: student.name,
+      instructor_id: user.id,
+      student_id: studentId,
+      student_name: student.name,
       title,
       description,
       exercises,
     }
 
-    saveWorkout(workoutData)
+    if (workout) {
+      const { error } = await supabase.from("workout_plans").update(workoutData).eq("id", workout.id)
+      if (error) {
+        toast({
+          title: "Erro ao atualizar",
+          description: "Não foi possível atualizar o plano de treino",
+          variant: "destructive",
+        })
+        return
+      }
+    } else {
+      const { error } = await supabase.from("workout_plans").insert(workoutData)
+      if (error) {
+        toast({
+          title: "Erro ao criar",
+          description: "Não foi possível criar o plano de treino",
+          variant: "destructive",
+        })
+        return
+      }
+    }
 
     toast({
       title: workout ? "Plano atualizado" : "Plano criado",
