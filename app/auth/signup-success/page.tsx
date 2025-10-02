@@ -15,10 +15,30 @@ export default function SignupSuccessPage() {
           <CardDescription className="text-base">Verifique seu email para confirmar sua conta</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground text-center">
-            Enviamos um email de confirmação para o endereço fornecido. Por favor, clique no link do email para ativar
-            sua conta antes de fazer login.
-          </p>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p className="text-center">
+              Enviamos um email de confirmação para o endereço fornecido. Por favor, clique no link do email para ativar
+              sua conta antes de fazer login.
+            </p>
+
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-2">
+              <p className="font-medium text-orange-900">O email não chegou?</p>
+              <ul className="list-disc list-inside space-y-1 text-orange-800">
+                <li>Verifique sua pasta de spam ou lixo eletrônico</li>
+                <li>Aguarde alguns minutos - pode demorar um pouco</li>
+                <li>Verifique se digitou o email corretamente</li>
+              </ul>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+              <p className="font-medium text-blue-900">💡 Modo de desenvolvimento</p>
+              <p className="text-blue-800 text-xs">
+                Se você está testando em desenvolvimento, o Supabase pode não enviar emails reais. Verifique o console
+                do Supabase ou os logs do servidor para encontrar o link de confirmação.
+              </p>
+            </div>
+          </div>
+
           <Button asChild className="w-full bg-orange-500 hover:bg-orange-600">
             <Link href="/">Voltar para o login</Link>
           </Button>
