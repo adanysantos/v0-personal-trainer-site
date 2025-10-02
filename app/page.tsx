@@ -27,13 +27,10 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("[v0] handleLogin called")
     setIsLoading(true)
 
     try {
-      console.log("[v0] Creating Supabase client for login")
       const supabase = createClient()
-      console.log("[v0] Supabase client created, attempting sign in")
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
@@ -53,30 +50,24 @@ export default function LoginPage() {
         router.push(profile?.user_type === "instructor" ? "/instructor" : "/student")
       }
     } catch (error: any) {
-      console.log("[v0] Login error:", error)
       toast({
         title: "Erro no login",
         description: error.message || "Email ou senha incorretos",
         variant: "destructive",
       })
     } finally {
-      console.log("[v0] handleLogin finished")
       setIsLoading(false)
     }
   }
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("[v0] handleSignup called")
-    console.log("[v0] Signup data:", { email: signupEmail, name: signupName, userType: signupUserType })
     setIsLoading(true)
 
     try {
-      console.log("[v0] Creating Supabase client for signup")
       const supabase = createClient()
-      console.log("[v0] Supabase client created, attempting sign up")
 
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email: signupEmail,
         password: signupPassword,
         options: {
@@ -90,27 +81,16 @@ export default function LoginPage() {
         },
       })
 
-      console.log("[v0] Signup response:", { data, error })
-
       if (error) throw error
 
-      toast({
-        title: "Conta criada com sucesso!",
-        description: "Verifique seu email para confirmar sua conta.",
-      })
-
-      setSignupEmail("")
-      setSignupPassword("")
-      setSignupName("")
+      router.push("/auth/signup-success")
     } catch (error: any) {
-      console.log("[v0] Signup error:", error)
       toast({
         title: "Erro ao criar conta",
         description: error.message || "Ocorreu um erro ao criar sua conta",
         variant: "destructive",
       })
     } finally {
-      console.log("[v0] handleSignup finished")
       setIsLoading(false)
     }
   }

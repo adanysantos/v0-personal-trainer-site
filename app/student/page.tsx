@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dumbbell, TrendingUp, Target } from "lucide-react"
 import { WorkoutDetailCard } from "@/components/workout-detail-card"
 import type { WorkoutPlan } from "@/lib/types"
-import { createBrowserClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 
 export const dynamic = "force-dynamic"
 
@@ -26,7 +26,7 @@ export default function StudentDashboard() {
     if (!mounted) return
 
     async function loadData() {
-      const supabase = createBrowserClient()
+      const supabase = createClient()
 
       const {
         data: { user },
