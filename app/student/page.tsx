@@ -12,14 +12,22 @@ import { createBrowserClient } from "@/lib/supabase/client"
 export const dynamic = "force-dynamic"
 
 export default function StudentDashboard() {
+  const [mounted, setMounted] = useState(false)
   const [workouts, setWorkouts] = useState<WorkoutPlan[]>([])
   const [loading, setLoading] = useState(true)
   const [userName, setUserName] = useState("")
   const router = useRouter()
-  const supabase = createBrowserClient()
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+
     async function loadData() {
+      const supabase = createBrowserClient()
+
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -52,9 +60,9 @@ export default function StudentDashboard() {
     }
 
     loadData()
-  }, [router, supabase])
+  }, [router, mounted])
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center">
         <div className="text-center">

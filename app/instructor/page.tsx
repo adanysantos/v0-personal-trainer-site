@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast"
 export const dynamic = "force-dynamic"
 
 export default function InstructorDashboard() {
+  const [mounted, setMounted] = useState(false)
   const [workouts, setWorkouts] = useState<WorkoutPlan[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -24,8 +25,13 @@ export default function InstructorDashboard() {
   const { toast } = useToast()
 
   useEffect(() => {
-    checkAuthAndLoadData()
+    setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+    checkAuthAndLoadData()
+  }, [mounted])
 
   const checkAuthAndLoadData = async () => {
     const supabase = createClient()
@@ -126,7 +132,7 @@ export default function InstructorDashboard() {
     }
   }
 
-  if (isLoading) {
+  if (!mounted || isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center">
         <div className="text-center">
