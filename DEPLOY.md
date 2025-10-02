@@ -50,13 +50,22 @@ Após o deploy, você precisa adicionar a URL de produção no Supabase:
 
 1. Acesse o [Supabase Dashboard](https://supabase.com/dashboard)
 2. Vá em **Authentication** → **URL Configuration**
-3. Adicione sua URL do Vercel em **Redirect URLs**:
-   - `https://seu-site.vercel.app/auth/callback`
-   - `https://seu-site.vercel.app`
+3. Adicione suas URLs em **Redirect URLs**:
+   - `https://trainer-site.app/auth/callback`
+   - `https://trainer-site.app`
+   - `https://www.trainer-site.app/auth/callback` (se usar www)
+   - `https://www.trainer-site.app` (se usar www)
 
-### 5. Testar a Aplicação
+### 5. Configurar Domínio Customizado no Vercel
 
-1. Acesse sua URL do Vercel
+1. No Vercel Dashboard, vá em **Settings** → **Domains**
+2. Adicione `trainer-site.app` e `www.trainer-site.app`
+3. Configure os registros DNS conforme instruções do Vercel
+4. Aguarde a propagação do DNS (pode levar até 48h)
+
+### 6. Testar a Aplicação
+
+1. Acesse https://trainer-site.app
 2. Crie uma conta de instrutor
 3. Crie uma conta de aluno (use outro email)
 4. Faça login como instrutor e crie um plano de treino
@@ -96,6 +105,7 @@ Se encontrar problemas:
 2. Confirme que as variáveis de ambiente estão corretas
 3. Verifique os logs no Vercel Dashboard
 4. Teste a conexão com o Supabase
+5. Confirme que as Redirect URLs estão configuradas no Supabase
 
 ---
 
