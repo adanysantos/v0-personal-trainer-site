@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
@@ -8,41 +8,115 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Users, Dumbbell, Calendar } from "lucide-react"
 import { WorkoutCard } from "@/components/workout-card"
 import { WorkoutDialog } from "@/components/workout-dialog"
-import type { WorkoutPlan } from "@/lib/types"
+import type { WorkoutPlan, Profile } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 
 export const dynamic = "force-dynamic"
 
-export default function InstructorDashboard() {
-  const [mounted, setMounted] = useState(false)
+// --- Hook Personalizado para Lógica de Dados e Autenticação ---
+interface DashboardData {
+  workouts: WorkoutPlan[]
+  students: Profile[]
+  isLoading: boolean
+  loadData: () => Promise<void>
+}
+
+// Define a more specific type for the data coming from the Supabase query.
+// This improves type safety and autocompletion.
+type WorkoutFromDB = {
+  id: string
+  student_id: string
+  title: string
+  description: string | null
+  created_at: string
+  updated_at: string
+  student: {
+    full_name: string
+  } | null
+  exercises: {
+    id: string
+    name: string
+    sets: number
+    reps: string
+    rest_time: string | null
+    notes: string | null
+    order_index: number
+  }[]
+}
+
+// Função utilitária para carregar os dados
+const fetchInstructorData = async (instructorId: string, toast: ReturnType<typeof useToast>["toast"]) => {
+  const supabase = createClient()
+  
+  try {
+    // 1. Load students (All students, assuming any instructor sees all students for assignment)
+    const { data: studentsData, error: studentsError } = await supabase.from("profiles").select("*").eq("user_type", "student")
+
+    if (studentsError) throw studentsError
+
+    // 2. Load workouts with exercises
+    const { data: workoutsData, error: workoutsError } = await supabase
+      .from("workout_plans")
+      .select(`
+        *,
+        exercises(*),
+        student:profiles!workout_plans_student_id_fkey (full_name)
+      `)
+      .eq("instructor_id", instructorId)
+      .order("created_at", { ascending: false })
+
+    if (workoutsError) throw workoutsError
+
+    // Map the database results to the application's WorkoutPlan type with strong typing.
+    const formattedWorkouts: WorkoutPlan[] = (workoutsData as WorkoutFromDB[] || []).map((w) => ({
+      id: w.id,
+      student_id: w.student_id,
+      student_name: w.student?.full_name || "Aluno Desconhecido",
+      title: w.title,
+      description: w.description || "",
+      exercises: (w.exercises || [])
+        .sort((a, b) => a.order_index - b.order_index)
+        .map((e) => ({
+        id: e.id,
+        name: e.name,
+        sets: e.sets,
+        reps: e.reps,
+        rest: e.rest_time || "",
+        notes: e.notes || "",
+        })),
+      created_at: w.created_at,
+      updated_at: w.updated_at,
+    }))
+    
+    return { students: studentsData || [], workouts: formattedWorkouts }
+
+  } catch (error: any) {
+    toast({
+      title: "Erro ao carregar dados",
+      description: error.message,
+      variant: "destructive",
+    })
+    return { students: [], workouts: [] }
+  }
+}
+
+const useInstructorDashboardData = (): DashboardData => {
   const [workouts, setWorkouts] = useState<WorkoutPlan[]>([])
-  const [students, setStudents] = useState<any[]>([])
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingWorkout, setEditingWorkout] = useState<WorkoutPlan | null>(null)
+  const [students, setStudents] = useState<Profile[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
   const { toast } = useToast()
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  useEffect(() => {
-    if (!mounted) return
-    checkAuthAndLoadData()
-  }, [mounted])
-
-  const checkAuthAndLoadData = async () => {
+  const loadData = useCallback(async () => {
+    setIsLoading(true)
     const supabase = createClient()
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
       router.push("/")
-      return
+      return // Interrompe se não houver usuário
     }
 
     // Check if user is instructor
@@ -50,64 +124,33 @@ export default function InstructorDashboard() {
 
     if (profile?.user_type !== "instructor") {
       router.push("/student")
-      return
+      return // Interrompe se não for instrutor
     }
 
-    await loadData(user.id)
-  }
+    const { students: loadedStudents, workouts: loadedWorkouts } = await fetchInstructorData(user.id, toast)
 
-  const loadData = async (instructorId: string) => {
-    const supabase = createClient()
-    setIsLoading(true)
+    setStudents(loadedStudents)
+    setWorkouts(loadedWorkouts)
+    setIsLoading(false)
+  }, [router, toast])
 
-    try {
-      // Load students
-      const { data: studentsData } = await supabase.from("profiles").select("*").eq("user_type", "student")
 
-      setStudents(studentsData || [])
+  useEffect(() => {
+    // Carrega os dados quando o componente é montado
+    loadData()
+  }, [loadData])
 
-      // Load workouts with exercises
-      const { data: workoutsData } = await supabase
-        .from("workout_plans")
-        .select(`
-          *,
-          exercises (*),
-          student:profiles!workout_plans_student_id_fkey (full_name)
-        `)
-        .eq("instructor_id", instructorId)
-        .order("created_at", { ascending: false })
+  return { workouts, students, isLoading, loadData }
+}
+// -----------------------------------------------------------------
 
-      const formattedWorkouts: WorkoutPlan[] = (workoutsData || []).map((w: any) => ({
-        id: w.id,
-        studentId: w.student_id,
-        studentName: w.student?.full_name || "Aluno",
-        title: w.title,
-        description: w.description || "",
-        exercises: (w.exercises || [])
-          .sort((a: any, b: any) => a.order_index - b.order_index)
-          .map((e: any) => ({
-            id: e.id,
-            name: e.name,
-            sets: e.sets,
-            reps: e.reps,
-            rest: e.rest_time || "",
-            notes: e.notes || "",
-          })),
-        createdAt: w.created_at,
-        updatedAt: w.updated_at,
-      }))
 
-      setWorkouts(formattedWorkouts)
-    } catch (error: any) {
-      toast({
-        title: "Erro ao carregar dados",
-        description: error.message,
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
+export default function InstructorDashboard() {
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingWorkout, setEditingWorkout] = useState<WorkoutPlan | null>(null)
+  
+  // Usando o hook para gerenciar dados e estado de loading
+  const { workouts, students, isLoading, loadData } = useInstructorDashboardData()
 
   const handleCreateNew = () => {
     setEditingWorkout(null)
@@ -122,17 +165,12 @@ export default function InstructorDashboard() {
   const handleDialogClose = async () => {
     setIsDialogOpen(false)
     setEditingWorkout(null)
-
-    const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (user) {
-      await loadData(user.id)
-    }
+    
+    // Recarrega os dados após fechar o dialog (se foi criado/editado)
+    await loadData()
   }
 
-  if (!mounted || isLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center">
         <div className="text-center">
@@ -172,11 +210,12 @@ export default function InstructorDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Ativos Hoje</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Alunos Ativos</CardTitle>
               <Calendar className="w-4 h-4 text-orange-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{students.length}</div>
+              <div className="text-3xl font-bold">{students.length}</div> 
+              {/* Mantido students.length, mas este card pode ser melhorado com uma contagem real de ativos */}
             </CardContent>
           </Card>
         </div>
